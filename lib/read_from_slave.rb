@@ -69,10 +69,10 @@ module ReadFromSlave
       end
 
       begin
-        calculation_base = ActiveRecord::Relation  # rails 3
+        calculation_base = ActiveRecord::Relation # rails 3
         calculation_base.send(:include, CalculationMethod)
         calculation_base.alias_method_chain :calculate, :read_from_slave
-      rescue NameError  # rails 2
+      rescue NameError # rails 2
         base.extend(CalculationMethod)
         base.class_eval do
           class << self
@@ -83,17 +83,19 @@ module ReadFromSlave
     end
 
     def install_with_methods!
-      ActiveRecord::Base.connection.instance_variable_get(:@config)[:slaves].each_key do |slave_name|
-        ActiveRecord::Base.class_eval <<-EOM
-          def self.with_#{slave_name}(&block)
-            Thread.current[:with_#{slave_name}_count] ||= 0
-            Thread.current[:with_#{slave_name}_count] += 1
-            yield
-          ensure
-            Thread.current[:with_#{slave_name}_count] -= 1
-          end
-        EOM
-      end if ActiveRecord::Base.connection.instance_variable_get(:@config)[:slaves]
+      if ActiveRecord::Base.connection.instance_variable_get(:@config)[:slaves]
+        ActiveRecord::Base.connection.instance_variable_get(:@config)[:slaves].each_key do |slave_name|
+          ActiveRecord::Base.class_eval <<-EOM
+            def self.with_#{slave_name}(&block)
+              Thread.current[:with_#{slave_name}_count] ||= 0
+              Thread.current[:with_#{slave_name}_count] += 1
+              yield
+            ensure
+              Thread.current[:with_#{slave_name}_count] -= 1
+            end
+          EOM
+        end
+      end
     end
 
     def default_to_master!
@@ -118,8 +120,6 @@ module ReadFromSlave
     def on_master
       Thread.current[:on_master] = true
       yield if block_given?
-    rescue
-      raise
     ensure
       Thread.current[:on_master] = false
     end
@@ -133,11 +133,10 @@ module ReadFromSlave
   end
 
   module ClassMethods
-
     @@slave_models = {}
 
     def find_by_sql_with_read_from_slave(*find_args)
-      reload = (:reload  == Thread.current[:read_from_slave])
+      reload = (Thread.current[:read_from_slave] == :reload)
       on_master = Thread.current[:on_master]
       Thread.current[:read_from_slave] = !(reload || on_master)
       find_by_sql_without_read_from_slave(*find_args)
@@ -158,7 +157,7 @@ module ReadFromSlave
       normal_connection = connection_without_read_from_slave
       if use_read_from_slave_for_connection?(normal_connection)
         slave_name, slave_config = select_slave
-        Thread.current[:read_from_slave_uses] = slave_name.to_sym  # for testing use
+        Thread.current[:read_from_slave_uses] = slave_name.to_sym # for testing use
         slave_connection(slave_config)
       else
         Thread.current[:read_from_slave_uses] = :master
@@ -187,7 +186,6 @@ module ReadFromSlave
       @slave_model ||= {}
       (@slave_model[slave_config] || slave_model(slave_config)).connection_without_read_from_slave
     end
-
 
     # Returns an AR model class that has a connection to the appropriate slave db
     #

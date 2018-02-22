@@ -2,9 +2,9 @@ require 'rake'
 require 'rake/testtask'
 require_relative 'test/helper'
 
-task :default => [:test_read_from_slave]
+task default: [:test_read_from_slave]
 
-task :test => :default
+task test: :default
 
 Rake::TestTask.new(:test_with_active_record) do |t|
   t.libs << ReadFromSlave::ActiveRecordTest::AR_TEST_SUITE
