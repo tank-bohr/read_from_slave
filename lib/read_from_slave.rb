@@ -1,7 +1,8 @@
-# Read_from_slave for Rails enables database reads from one or more slave databases, while writes continue
-# to go to the master
-# To use read_from_slave you must install the gem, configure the gem in your environment file,
-# and setup your database.yml file with an entry for your slave database.
+# Read_from_slave for Rails enables database reads from one or more slave
+# databases, while writes continue to go to the master
+# To use read_from_slave you must install the gem, configure the gem in your
+# environment file, and setup your database.yml file with an entry for your
+# slave database.
 #
 #   gem install read_from_slave
 #
@@ -39,7 +40,8 @@
 #     password: mypassword
 #     host: my.slave.database.server.com
 #
-# Note that if you have multiple databases you can also configure multiple slaves.
+# Note that if you have multiple databases you can also configure multiple
+# slaves.
 #
 # === References
 # * "Masochism":http://github.com/technoweenie/masochism/tree/master
@@ -69,10 +71,10 @@ module ReadFromSlave
       end
 
       begin
-        calculation_base = ActiveRecord::Relation  # rails 3
+        calculation_base = ActiveRecord::Relation # rails 3
         calculation_base.send(:include, CalculationMethod)
         calculation_base.alias_method_chain :calculate, :read_from_slave
-      rescue NameError  # rails 2
+      rescue NameError # rails 2
         base.extend(CalculationMethod)
         base.class_eval do
           class << self
@@ -83,8 +85,11 @@ module ReadFromSlave
     end
 
     def install_with_methods!
-      ActiveRecord::Base.connection.instance_variable_get(:@config)[:slaves].each_key do |slave_name|
-        ActiveRecord::Base.class_eval <<-EOM
+      return unless ActiveRecord::Base.connection.instance_variable_get(:@config)[:slaves]
+
+      slaves = ActiveRecord::Base.connection.instance_variable_get(:@config)[:slaves]
+      slaves.each_key do |slave_name|
+        ActiveRecord::Base.class_eval <<-RUBY, __FILE__, __LINE__ + 1
           def self.with_#{slave_name}(&block)
             Thread.current[:with_#{slave_name}_count] ||= 0
             Thread.current[:with_#{slave_name}_count] += 1
@@ -92,8 +97,8 @@ module ReadFromSlave
           ensure
             Thread.current[:with_#{slave_name}_count] -= 1
           end
-        EOM
-      end if ActiveRecord::Base.connection.instance_variable_get(:@config)[:slaves]
+        RUBY
+      end
     end
 
     def default_to_master!
@@ -118,8 +123,6 @@ module ReadFromSlave
     def on_master
       Thread.current[:on_master] = true
       yield if block_given?
-    rescue
-      raise
     ensure
       Thread.current[:on_master] = false
     end
@@ -133,11 +136,10 @@ module ReadFromSlave
   end
 
   module ClassMethods
-
     @@slave_models = {}
 
     def find_by_sql_with_read_from_slave(*find_args)
-      reload = (:reload  == Thread.current[:read_from_slave])
+      reload = (Thread.current[:read_from_slave] == :reload)
       on_master = Thread.current[:on_master]
       Thread.current[:read_from_slave] = !(reload || on_master)
       find_by_sql_without_read_from_slave(*find_args)
@@ -156,20 +158,28 @@ module ReadFromSlave
 
     def connection_with_read_from_slave
       normal_connection = connection_without_read_from_slave
-      if Thread.current[:read_from_slave] && normal_connection.open_transactions == 0
-        slaves.each do |slave_name, slave_config|
-          if Thread.current[:"with_#{slave_name}_count"].to_i > 0
-            Thread.current[:read_from_slave_uses] = slave_name.to_sym  # for testing use
-            return slave_connection(slave_config)
-          end
-        end
-        # If we're not in a with_slave block, default to the primary slave
-        Thread.current[:read_from_slave_uses] = primary_slave_name  # for testing use
-        return slave_connection(primary_slave_config)
+      if use_read_from_slave_for_connection?(normal_connection)
+        slave_name, slave_config = select_slave
+        Thread.current[:read_from_slave_uses] = slave_name.to_sym # for testing use
+        slave_connection(slave_config)
       else
         Thread.current[:read_from_slave_uses] = :master
-        return normal_connection
+        normal_connection
       end
+    end
+
+    def use_read_from_slave_for_connection?(normal_connection)
+      Thread.current[:read_from_slave] && normal_connection.open_transactions.zero?
+    end
+
+    def select_slave
+      slaves.detect { |slave_name, _slave_config| use_slave?(slave_name) } ||
+        # If we're not in a with_slave block, default to the primary slave
+        [primary_slave_name, primary_slave_config]
+    end
+
+    def use_slave?(slave_name)
+      Thread.current[:"with_#{slave_name}_count"].to_i > 0
     end
 
     # Returns a connection to the slave database, or to the regular database if
@@ -180,20 +190,19 @@ module ReadFromSlave
       (@slave_model[slave_config] || slave_model(slave_config)).connection_without_read_from_slave
     end
 
-
     # Returns an AR model class that has a connection to the appropriate slave db
     #
     def slave_model(slave_config)
       if slave_config_for(slave_config)
         unless @@slave_models[slave_config]
           slave_model_name = "ReadFromSlaveFor_#{slave_config}"
-          @@slave_models[slave_config] = eval %{
+          @@slave_models[slave_config] = eval <<-RUBY, __FILE__, __LINE__ + 1
             class #{slave_model_name} < ActiveRecord::Base
               self.abstract_class = true
               establish_slave_connection_for('#{slave_config}')
             end
             #{slave_model_name}
-          }
+          RUBY
         end
         @slave_model[slave_config] = @@slave_models[slave_config]
       else

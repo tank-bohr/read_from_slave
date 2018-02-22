@@ -4,16 +4,15 @@ require 'active_support/test_case'
 module ReadFromSlave
   class Test
     class << self
-
       def setup
         setup_constants
         make_sqlite_config
         make_sqlite_connection
         load_models
-        load(SCHEMA_ROOT + "/schema.rb")
+        load(SCHEMA_ROOT + '/schema.rb')
         ActiveSupport::TestCase.test_order = :sorted
         require 'minitest/autorun'
-        require File.join(File.dirname(__FILE__), '..', 'lib', 'read_from_slave')
+        require_relative '../lib/read_from_slave'
       end
 
       def test_files
@@ -21,49 +20,53 @@ module ReadFromSlave
       end
 
       def test_model_files
-        %w{course}
+        %w[course]
       end
 
       private
 
       def setup_constants
-        set_constant('TEST_ROOT') { File.expand_path(File.dirname(__FILE__)) }
-        set_constant('SCHEMA_ROOT') { TEST_ROOT + "/schema" }
+        set_constant('TEST_ROOT') { __dir__ }
+        set_constant('SCHEMA_ROOT') { TEST_ROOT + '/schema' }
       end
 
       def make_sqlite_config
         ActiveRecord::Base.configurations = {
-            'rfs' => {
-                :adapter => 'sqlite3',
-                :database => 'test_db',
-                :timeout => 5000,
-                :slaves =>
-                    {'primary_slave' => 'primary_slave',
-                     :slave_2 => 'slave_2'
-                    }
-            },
-            'primary_slave' => {
-                :adapter => 'sqlite3',
-                :database => 'test_db',
-                :timeout => 5000
-            },
-            'slave_2' => {
-                :adapter => 'sqlite3',
-                :database => 'test_db',
-                :timeout => 5000
+          'rfs' => {
+            adapter: 'sqlite3',
+            database: 'test_db',
+            timeout: 5000,
+            slaves: {
+              'primary_slave' => 'primary_slave',
+              :slave_2 => 'slave_2'
             }
+          },
+          'primary_slave' => {
+            adapter: 'sqlite3',
+            database: 'test_db',
+            timeout: 5000
+          },
+          'slave_2' => {
+            adapter: 'sqlite3',
+            database: 'test_db',
+            timeout: 5000
+          }
         }
       end
 
       def load_models
-        test_model_files.each { |f| require File.join(File.dirname(__FILE__), "models", f) }
+        test_model_files.each { |f| require_relative "models/#{f}" }
       end
 
       def make_sqlite_connection
-        ActiveRecord::Base.establish_connection(ActiveRecord::Base.configurations['rfs'])
+        ActiveRecord::Base.establish_connection(
+          ActiveRecord::Base.configurations['rfs']
+        )
       end
 
+      # rubocop:disable Naming/AccessorMethodName
       def set_constant(constant)
+        # rubocop:enable Naming/AccessorMethodName
         Object.const_set(constant, yield) unless Object.const_defined?(constant)
       end
 
@@ -95,7 +98,7 @@ module ReadFromSlave
       end
 
       def find_active_record_test_suite
-        ts = ($:).grep(/activerecord/).last.split('/')
+        ts = $LOAD_PATH.grep(/activerecord/).last.split('/')
         ts.pop
         ts << 'test'
         ts.join('/')

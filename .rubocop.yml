@@ -1,0 +1,26 @@
+AllCops:
+  Exclude:
+    - '*.gemspec'
+
+Metrics/LineLength:
+  Max: 100
+  Exclude:
+    - 'test/*_test.rb'
+
+# TODO: Decrease max value
+Metrics/MethodLength:
+  Max: 30
+
+# TODO: get rid of class vars
+Style/ClassVars:
+  Enabled: false
+
+# TODO: get rid of eval
+Security/Eval:
+  Enabled: false
+
+Style/Documentation:
+  Enabled: false
+
+Layout/AlignParameters:
+  EnforcedStyle: with_fixed_indentation
