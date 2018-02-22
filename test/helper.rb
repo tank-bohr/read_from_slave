@@ -12,7 +12,7 @@ module ReadFromSlave
         load(SCHEMA_ROOT + '/schema.rb')
         ActiveSupport::TestCase.test_order = :sorted
         require 'minitest/autorun'
-        require File.join(File.dirname(__FILE__), '..', 'lib', 'read_from_slave')
+        require_relative '../lib/read_from_slave'
       end
 
       def test_files
@@ -36,8 +36,10 @@ module ReadFromSlave
             adapter: 'sqlite3',
             database: 'test_db',
             timeout: 5000,
-            slaves:                   { 'primary_slave' => 'primary_slave',
-                                        :slave_2 => 'slave_2' }
+            slaves: {
+              'primary_slave' => 'primary_slave',
+              :slave_2 => 'slave_2'
+            }
           },
           'primary_slave' => {
             adapter: 'sqlite3',
@@ -53,14 +55,18 @@ module ReadFromSlave
       end
 
       def load_models
-        test_model_files.each { |f| require File.join(File.dirname(__FILE__), 'models', f) }
+        test_model_files.each { |f| require_relative "models/#{f}" }
       end
 
       def make_sqlite_connection
-        ActiveRecord::Base.establish_connection(ActiveRecord::Base.configurations['rfs'])
+        ActiveRecord::Base.establish_connection(
+          ActiveRecord::Base.configurations['rfs']
+        )
       end
 
+      # rubocop:disable Naming/AccessorMethodName
       def set_constant(constant)
+        # rubocop:enable Naming/AccessorMethodName
         Object.const_set(constant, yield) unless Object.const_defined?(constant)
       end
 

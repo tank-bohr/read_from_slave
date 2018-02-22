@@ -4,7 +4,10 @@ ReadFromSlave::Test.setup
 
 class ReadFromSlaveTest < ActiveSupport::TestCase
   test 'slave connection should be different from normal connection' do
-    assert_not_equal Course.connection_without_read_from_slave, Course.slave_connection(Course.primary_slave_config)
+    assert_not_equal(
+      Course.connection_without_read_from_slave,
+      Course.slave_connection(Course.primary_slave_config)
+    )
   end
 
   test 'should be able to write and read from database' do

@@ -10,7 +10,9 @@ Rake::TestTask.new(:test_with_active_record) do |t|
   t.libs << ReadFromSlave::ActiveRecordTest::AR_TEST_SUITE
   t.libs << ReadFromSlave::ActiveRecordTest.connection
   t.test_files = ReadFromSlave::ActiveRecordTest.test_files
-  t.ruby_opts = ["-r #{File.join(File.dirname(__FILE__), 'test', 'active_record_setup')}"]
+  t.ruby_opts = [
+    "-r #{File.join(File.dirname(__FILE__), 'test', 'active_record_setup')}"
+  ]
   t.verbose = true
 end
 

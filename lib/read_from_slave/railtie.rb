@@ -3,8 +3,7 @@ require 'rails'
 
 module ReadFromSlave
   class Railtie < Rails::Railtie
-    initializer 'read_from_slave.install_with_methods', after: 'active_record.initialize_database' do |_app|
-      ReadFromSlave.install_with_methods!
-    end
+    initializer('read_from_slave.install_with_methods',
+      after: 'active_record.initialize_database') { |_app| ReadFromSlave.install_with_methods! }
   end
 end
