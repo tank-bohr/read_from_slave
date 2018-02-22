@@ -156,20 +156,28 @@ module ReadFromSlave
 
     def connection_with_read_from_slave
       normal_connection = connection_without_read_from_slave
-      if Thread.current[:read_from_slave] && normal_connection.open_transactions == 0
-        slaves.each do |slave_name, slave_config|
-          if Thread.current[:"with_#{slave_name}_count"].to_i > 0
-            Thread.current[:read_from_slave_uses] = slave_name.to_sym  # for testing use
-            return slave_connection(slave_config)
-          end
-        end
-        # If we're not in a with_slave block, default to the primary slave
-        Thread.current[:read_from_slave_uses] = primary_slave_name  # for testing use
-        return slave_connection(primary_slave_config)
+      if use_read_from_slave_for_connection?(normal_connection)
+        slave_name, slave_config = select_slave
+        Thread.current[:read_from_slave_uses] = slave_name.to_sym  # for testing use
+        slave_connection(slave_config)
       else
         Thread.current[:read_from_slave_uses] = :master
-        return normal_connection
+        normal_connection
       end
+    end
+
+    def use_read_from_slave_for_connection?(normal_connection)
+      Thread.current[:read_from_slave] && normal_connection.open_transactions == 0
+    end
+
+    def select_slave
+      slaves.detect { |slave_name, _slave_config| use_slave?(slave_name) } ||
+        # If we're not in a with_slave block, default to the primary slave
+        [primary_slave_name, primary_slave_config]
+    end
+
+    def use_slave?(slave_name)
+      Thread.current[:"with_#{slave_name}_count"].to_i > 0
     end
 
     # Returns a connection to the slave database, or to the regular database if
